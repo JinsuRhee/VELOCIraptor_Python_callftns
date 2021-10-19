@@ -239,11 +239,13 @@ def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
     n_new       = len(pinfo)*1.
     rate        = n_new / n_old
 
-    pinfo[:,0:2]    *= unit_l / 3.086e21
-    pinfo[:,3:5]    *= kms
-    pinfo[:,6]      *= unit_m / 1.98892e33
+    pinfo[:,0]    *= unit_l / 3.086e21
+    pinfo[:,1]    *= unit_l / 3.086e21
+    pinfo[:,2]    *= unit_l / 3.086e21
+    pinfo[:,3]    *= kms
+    pinfo[:,4]    *= kms
+    pinfo[:,5]    *= kms
+    pinfo[:,6]    *= unit_m / 1.98892e33
 
 
     return pinfo, rate, domlist
-    #pinfo(:,)
-    ##return idlist, domlist
