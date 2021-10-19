@@ -38,7 +38,7 @@ CONTAINS
 
       !ALLOCATE(ptcl(1:n_ptcl,1:9))
       !ptcl = -1.0d8
-
+      IF(ALLOCATED(ptcl)) DEALLOCATE(ptcl)
       CALL OMP_SET_NUM_THREADS(n_thread)
 
 !!!!! RD PART

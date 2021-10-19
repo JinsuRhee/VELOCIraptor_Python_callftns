@@ -40,7 +40,7 @@ contains
       levmax    = larr(4)
 
       rfact     = darr(1)
-
+      IF(ALLOCATED(dom_list)) DEALLOCATE(dom_list)
       ALLOCATE(dom_list(1:n_ptcl, 1:n_mpi))
       dom_list = -1
 
