@@ -24,7 +24,9 @@ num_thread = int(40)
 dir_raw     = '/storage5/FORNAX/KISTI_OUTPUT/l10006/'
 dir_catalog = '/storage5/FORNAX/VELOCIraptor/l10006/'
 
-
+##-----
+## VR output-related
+##-----
 column_list     = ['ID', 'ID_mbp', 'hostHaloID', 'numSubStruct', 'Structuretype', 'Mvir', 'Mass_tot', 'Mass_FOF', 
                    'Mass_200mean', 'Efrac', 'Mass_200crit', 'Rvir', 'R_size', 'R_200mean', 'R_200crit', 
                    'R_HalfMass', 'R_HalfMass_200mean', 'R_HalfMass_200crit', 'Rmax', 'Xc', 'Yc', 'Zc', 'VXc', 
@@ -39,15 +41,24 @@ simulation_type='FN'
 if(simulation_type=='NH'):
     r_type_llint    = False
     r_type_family   = False
-if(simulation_type=='NH2' or simulation_type=='FN'):
+    r_type_neff     = 4096
+    r_type_ndomain  = 4800
+if(simulation_type=='NH2'):
     r_type_llint    = False
     r_type_family   = True
-r_neff      = 2048
-r_ndomain   = 480
+    r_type_neff     = 4096
+    r_type_ndomain  = 480
+if(simulation_type=='FN'):
+    r_type_llint    = False
+    r_type_family   = True
+    r_type_neff     = 2048
+    r_type_ndomain  = 480
 
 
 ##-----
 ## LOAD GALAXY
+##      TO DO
+##      *) do not use 'imglist.txt'
 ##-----
 def f_rdgal(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, directory=dir_catalog):
     
@@ -119,7 +130,7 @@ def f_rdgal(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, d
 ##-----
 ## LOAD GALAXY
 ##      TO DO LIST
-##          INCLUDE FLUX & TIME COMPUTATION PARTS
+##          *) INCLUDE FLUX & TIME COMPUTATION PARTS
 ##-----
 def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
     p_pos=True, p_vel=False, p_gyr=False, p_sfactor=False, p_mass=True, p_flux=False, 
