@@ -131,6 +131,7 @@ def f_rdgal(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, d
 ## LOAD GALAXY
 ##      TO DO LIST
 ##          *) INCLUDE FLUX & TIME COMPUTATION PARTS
+##          *) Halo member load is not implemented
 ##-----
 def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
     p_pos=True, p_vel=False, p_gyr=False, p_sfactor=False, p_mass=True, p_flux=False, 
