@@ -136,7 +136,7 @@ def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
     p_pos=True, p_vel=False, p_gyr=False, p_sfactor=False, p_mass=True, p_flux=False, 
     p_metal=False, p_id=False, flux_list=flux_list, 
     raw=False, boxrange=50., domlist=[0], 
-    family=r_type_family, llint=r_type_llint, neff=r_neff, ndomain=r_ndomain,
+    family=r_type_family, llint=r_type_llint, neff=r_type_neff, ndomain=r_type_ndomain,
     dir_raw=dir_raw, dir_catalog=dir_catalog):
 
     """
