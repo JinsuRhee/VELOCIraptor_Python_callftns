@@ -190,6 +190,7 @@ def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
 
         find_domain_py.find_domain(xc, yc, zc, rr, hindex, larr, darr)
         domlist     = find_domain_py.dom_list
+        domlist     = domlist[0][:]
 
     domlist = np.int32(np.array(np.where(domlist > 0))[0] + 1)
     idlist  = np.int64(idlist)
