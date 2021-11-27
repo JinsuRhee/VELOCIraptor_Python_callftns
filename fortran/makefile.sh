@@ -2,6 +2,7 @@
 
 f2py3 -m find_domain_py --fcompiler=gfortran --f90flags='-fopenmp' -lgomp -c find_domain_py.f90
 f2py3 -m get_ptcl_py --fcompiler=gfortran --f90flags='-fopenmp' -lgomp -c get_ptcl_py.f90
+f2py3 -m get_flux_py --fcompiler=gfortran --f90flags='-fopenmp' -lgomp -c get_flux_py.f90
 
 #To be updated based on rur repo (https://bitbucket.org/sanhancluster/rur). Thanks San
 #FILES='find_domain_py.f90'

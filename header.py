@@ -17,6 +17,7 @@ import pickle
 
 from fortran.find_domain_py import find_domain_py
 from fortran.get_ptcl_py import get_ptcl_py
+from fortran.get_flux_py import get_flux_py
 
 ##-----
 ## General Settings
@@ -38,6 +39,7 @@ column_list     = ['ID', 'ID_mbp', 'hostHaloID', 'numSubStruct', 'Structuretype'
                    'VYc', 'VZc', 'Lx', 'Ly', 'Lz', 'sigV', 'Vmax', 'npart']
 gal_properties  = ['SFR', 'ABmag']
 flux_list = ['u', 'g', 'r', 'i', 'z']
+flux_zp = np.double(np.array([895.5*1e-11, 466.9*1e-11, 278.0*1e-11, 185.2*1e-11, 131.5*1e-11]))
 
 ##-----
 ## RAMSES-related Settings
@@ -59,6 +61,10 @@ if(simulation_type=='FN'):
     r_type_neff     = 2048
     r_type_ndomain  = 480
 
+##-----
+## SSP TYPE
+##-----
+ssp_type    = 'chab'
 
 ##-----
 ## LOAD GALAXY
@@ -291,8 +297,90 @@ def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
         ptcl['gyr'][:]  = gyr['gyr'][:]
         ptcl['sfact'][:]= gyr['sfact'][:]
 
+    #---- COMPUTE FLUX
+    if(p_flux==True):
+        for name in flux_list:
+            ptcl[name][:] = g_flux(ptcl['mass'][:], ptcl['metal'][:], ptcl['gyr'][:],name)[name]
+
     return ptcl, rate, domlist
 
+##-----
+## Compute Flux
+##-----
+def g_flux_ssptable(ssp_type=ssp_type):
+
+    fname   = 'table/ssp_' + ssp_type + '.pkl'
+    isfile = os.path.isfile(fname)
+
+    if(isfile==True):
+        with open(fname, 'rb') as f:
+            data = pickle.load(f)
+    else:
+        dname   = 'table/ssp_' + ssp_type
+
+        metal   = np.loadtxt(dname + '/metal.txt', dtype='<f8')
+        age     = np.loadtxt(dname + '/age.txt', dtype='<f8')
+        lambd   = np.loadtxt(dname + '/lambda.txt', dtype='<f8')
+
+        tr_curve    = []
+        for name in flux_list:
+            fname2  = dname + '/' + name + '_tr.txt'
+            tr_curve.append(np.loadtxt(fname2, dtype='<f8'))
+
+        flux   = np.zeros((len(metal), len(lambd), len(age)), dtype='<f8')
+        ind = np.array(range(len(metal)),dtype='int32')
+        for i in ind:
+            fname2  = dname + '/flux_%0.1d'%i + '.txt'
+            dum = np.array(np.loadtxt(fname2, dtype='<f8'))
+            dum = np.reshape(dum, (len(age),len(lambd)))
+            dum = np.transpose(dum)
+            flux[i,:,:] = dum
+            
+        data    = {"metal":metal, "age":age, "lambda":lambd, "tr_curve":tr_curve, "flux":flux}
+
+        with open(fname, 'wb') as f:
+            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+    return data
+
+def g_flux(mass, metal, age, fl_name, flux_list=flux_list, flux_zp=flux_zp, num_thread=num_thread):
+
+    #----- ALLOCATE
+    dtype   = ['']
+    for name in flux_list:
+        dtype   += [(name, '<f8')]
+    dtype   = dtype[1:]
+    data    = np.zeros(len(mass), dtype=dtype)
+
+    #----- LOAD SSP TABLE
+    ssp = g_flux_ssptable()
+
+    #----- COMPUTE FLUX
+    larr    = np.zeros(20, dtype=np.int32)
+    darr    = np.zeros(20, dtype='<f8')
+    larr[0]     = np.int32(len(mass))
+    larr[1]     = np.int32(len(ssp['age']))
+    larr[2]     = np.int32(len(ssp['metal']))
+    larr[3]     = np.int32(len(ssp['lambda']))
+    larr[10]    = num_thread
+
+    ind     = np.array(range(len(flux_list)),dtype='int32')
+    for i in ind:
+        if(flux_list[i]!=fl_name): continue
+        larr[4]     = np.int32(len(ssp['tr_curve'][:][i]))
+        get_flux_py.get_flux(age, metal, mass, ssp['age'], ssp['metal'], ssp['lambda'], ssp['flux'], ssp['tr_curve'][i][:,0], ssp['tr_curve'][i][:,1], larr, darr)
+
+        flux_tmp    = get_flux_py.flux * np.double(3.826e33) / (4. * np.pi * (10.0 * 3.08567758128e18)**2)
+
+        dlambda = ssp['tr_curve'][i][1:,0] - ssp['tr_curve'][i][:-1,0]
+        clambda = (ssp['tr_curve'][i][1:,0] + ssp['tr_curve'][i][:-1,0])/2.
+        trcurve  = (ssp['tr_curve'][i][1:,1] + ssp['tr_curve'][i][:-1,1])/2.
+
+        flux0   = np.sum(dlambda * clambda * trcurve * flux_zp[i])
+
+        data[flux_list[i]]    = flux_tmp / flux0
+
+
+    return data
 ##-----
 ## Compute Gyr from conformal time
 ##-----
