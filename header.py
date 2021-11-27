@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import h5py
+from scipy import interpolate
 from scipy.io import FortranFile
 import scipy.integrate as integrate
 import statistics
@@ -264,14 +265,10 @@ def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
     pinfo[:,5]    *= kms
     pinfo[:,6]    *= unit_m / 1.98892e33
 
-    #----- COMPUTE GYR
-    if(p_gyr==True):
-        gyr = g_gyr(n_snap, pinfo[:,7])
-
     #----- OUTPUT ARRAY
     dtype   = [('xx', '<f8'), ('yy', '<f8'), ('zz', '<f8'), 
         ('vx', '<f8'), ('vy', '<f8'), ('vz', '<f8'), 
-        ('mass', '<f8'), ('gyr', '<f8'), ('metal', '<f8')]
+        ('mass', '<f8'), ('sfact', '<f8'), ('gyr', '<f8'), ('metal', '<f8')]
     for name in flux_list:
         dtype   += [(name, '<f8')]
 
@@ -286,7 +283,14 @@ def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
     ptcl['vz'][:]   = pinfo[:,5]
 
     ptcl['mass'][:] = pinfo[:,6]
-    ptcl['metal'][:]= pinfo[:,8]    
+    ptcl['metal'][:]= pinfo[:,8]
+
+    #----- COMPUTE GYR
+    if(p_gyr==True):
+        gyr = g_gyr(n_snap, pinfo[:,7])
+        ptcl['gyr'][:]  = gyr['gyr'][:]
+        ptcl['sfact'][:]= gyr['sfact'][:]
+
     return ptcl, rate, domlist
 
 ##-----
@@ -297,16 +301,57 @@ def g_gyr(n_snap, t_conf, dir_raw=dir_raw):
     """
     Initial Settings
     """
+    aexp = np.double(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=9, max_rows=1)[2])
     H0 = np.double(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=10, max_rows=1)[2])
     omega_M = np.double(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=11, max_rows=1)[2])
     omega_L = np.double(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=12, max_rows=1)[2])
+    #----- Allocate
+    data    = np.zeros(len(t_conf), dtype=[('sfact','<f8'), ('gyr','<f8')])
 
     #----- Get Confalmal T - Sfact Table
     c_table = g_cfttable(H0, omega_M, omega_L)
 
-    plt.plot(c_table['sfact'], c_table['conft'])
-    plt.show()
-    return 1
+    #----- Get Sfactor by interpolation
+    lint = interpolate.interp1d(c_table['conft'],c_table['sfact'],kind = 'quadratic')
+    data['sfact'][:]   = lint(t_conf)
+
+    #----- Get Gyr from Sfactor
+    g_table = g_gyrtable(H0, omega_M, omega_L)
+    lint = interpolate.interp1d(g_table['redsh'],g_table['gyr'],kind = 'quadratic')
+    t0  = lint( 1./aexp - 1.)
+
+    data['gyr'][:]      = lint( 1./data['sfact'][:] - 1.) - t0
+    return data
+
+##-----
+## Generate or Load Sfactor-Gyr Table
+##-----
+def g_gyrtable_ftn(X, oM, oL):
+    return 1./(1.+X)/np.sqrt(oM*(1.+X)**3 + oL)
+
+def g_gyrtable(H0, oM, oL):
+
+    fname   = 'table/gyr_%0.5d'%(H0*1000.) + '_%0.5d'%(oM*100000.) + '_%0.5d'%(oL*100000.) + '.pkl'
+    isfile = os.path.isfile(fname)
+
+    if(isfile==True):
+        with open(fname, 'rb') as f:
+            data = pickle.load(f)
+    else:
+        n_table = np.int32(10000)
+        data    = np.zeros(n_table, dtype=[('redsh','<f8'),('gyr','<f8')])
+        data['redsh'][:]    = 1./(np.array(range(n_table),dtype='<f8')/(n_table - 1.) * 0.98 + 0.02) - 1.
+        data['gyr'][0]  = 0.
+
+        ind     = np.array(range(n_table),dtype='int32')
+        for i in ind:
+            data['gyr'][i]  = integrate.quad(g_gyrtable_ftn,0.,data['redsh'][i], args=(oM, oL))[0]
+            data['gyr'][i]  *= (1./H0 * np.double(3.08568025e19) / np.double(3.1536000e16))
+
+        with open(fname, 'wb') as f:
+            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+
+    return data
 
 ##-----
 ## Generate or Load Confal-Gyr Table
@@ -323,12 +368,11 @@ def g_cfttable(H0, oM, oL):
         with open(fname, 'rb') as f:
             data = pickle.load(f)
     else:
-        data    = np.zeros(10000, dtype=[('sfact','<f8'), ('conft','<f8')])
-
         n_table = np.int32(10000)
+        data    = np.zeros(n_table, dtype=[('sfact','<f8'), ('conft','<f8')])
         data['sfact'][:]    = np.array(range(n_table),dtype='<f8')/(n_table - 1.) * 0.98 + 0.02
 
-        ind     = np.array(range(10000),dtype='int32')
+        ind     = np.array(range(n_table),dtype='int32')
         for i in ind:
             data['conft'][i]  = integrate.quad(g_cfttable_ftn,data['sfact'][i],1.,args=(oM,oL))[0] * (-1.)
 
