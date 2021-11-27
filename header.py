@@ -260,5 +260,24 @@ def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
     pinfo[:,5]    *= kms
     pinfo[:,6]    *= unit_m / 1.98892e33
 
+    #----- OUTPUT ARRAY
+    dtype   = [('xx', '<f8'), ('yy', '<f8'), ('zz', '<f8'), 
+        ('vx', '<f8'), ('vy', '<f8'), ('vz', '<f8'), 
+        ('mass', '<f8'), ('gyr', '<f8'), ('metal', '<f8')]
+    for name in flux_list:
+        dtype   += [(name, '<f8')]
 
-    return pinfo, rate, domlist
+    ptcl    = np.zeros(np.int32(n_new), dtype=dtype)
+
+    ptcl['xx'][:]   = pinfo[:,0]
+    ptcl['yy'][:]   = pinfo[:,1]
+    ptcl['zz'][:]   = pinfo[:,2]
+
+    ptcl['vx'][:]   = pinfo[:,3]
+    ptcl['vy'][:]   = pinfo[:,4]
+    ptcl['vz'][:]   = pinfo[:,5]
+
+    ptcl['mass'][:] = pinfo[:,6]
+    ptcl['metal'][:]= pinfo[:,8]    
+    return ptcl, rate, domlist
+    #return pinfo, rate, domlist
