@@ -179,30 +179,36 @@ def f_rdptcl(n_snap, id0, horg='g', num_thread=num_thread,
         if(horg=='g'): domlist = np.array(dat.get("Domain_List"))
         else: domlist = np.zeros(1)
     else:
-        idlist  = np.zeros(1, dtype=np.int64)
-        domlist = np.zeros(ndomain, dtype=np.int32) - 1
+        #----- READ ALL PTCLs
+        if(id0<0):
+            idlist  = np.zeros(1,dtype=np.int64)
+            domlist  = np.array(range(ndomain),dtype='int32') + 1
+        #----- READ NEARBY PTCLs
+        else:
+            idlist  = np.zeros(1, dtype=np.int64)
+            domlist = np.zeros(ndomain, dtype=np.int32) - 1
 
-        #----- Find Domain
-        galtmp  = f_rdgal(n_snap, id0, horg=horg)
+            #----- Find Domain
+            galtmp  = f_rdgal(n_snap, id0, horg=horg)
 
-        xc  = galtmp['Xc']/unit_l * 3.086e21
-        yc  = galtmp['Yc']/unit_l * 3.086e21
-        zc  = galtmp['Zc']/unit_l * 3.086e21
-        rr  = galtmp['R_HalfMass']/unit_l * 3.086e21
-        larr    = np.zeros(20, dtype=np.int32)
-        darr    = np.zeros(20, dtype='<f8')
+            xc  = galtmp['Xc']/unit_l * 3.086e21
+            yc  = galtmp['Yc']/unit_l * 3.086e21
+            zc  = galtmp['Zc']/unit_l * 3.086e21
+            rr  = galtmp['R_HalfMass']/unit_l * 3.086e21
+            larr    = np.zeros(20, dtype=np.int32)
+            darr    = np.zeros(20, dtype='<f8')
 
-        larr[0] = np.int32(len(xc))
-        larr[1] = np.int32(len(domlist))
-        larr[2] = np.int32(num_thread)
-        larr[3] = np.int32(levmax)
+            larr[0] = np.int32(len(xc))
+            larr[1] = np.int32(len(domlist))
+            larr[2] = np.int32(num_thread)
+            larr[3] = np.int32(levmax)
 
-        darr[0] = 50.
-        if(boxrange!=None): darr[0] = boxrange / (rr * unit_l / 3.086e21)
+            darr[0] = 50.
+            if(boxrange!=None): darr[0] = boxrange / (rr * unit_l / 3.086e21)
 
-        find_domain_py.find_domain(xc, yc, zc, rr, hindex, larr, darr)
-        domlist     = find_domain_py.dom_list
-        domlist     = domlist[0][:]
+            find_domain_py.find_domain(xc, yc, zc, rr, hindex, larr, darr)
+            domlist     = find_domain_py.dom_list
+            domlist     = domlist[0][:]
 
     domlist = np.int32(np.array(np.where(domlist > 0))[0] + 1)
     idlist  = np.int64(idlist)
