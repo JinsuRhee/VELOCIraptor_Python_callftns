@@ -20,6 +20,7 @@ from fortran.get_ptcl_py import get_ptcl_py
 from fortran.get_flux_py import get_flux_py
 from fortran.jsamr2cell_totnum_py import jsamr2cell_totnum_py
 from fortran.jsamr2cell_py import jsamr2cell_py
+from fortran.js_gasmap_py import js_gasmap_py
 
 ##-----
 ## General Settings
@@ -488,8 +489,8 @@ def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread,
     """
     galtmp  = f_rdgal(n_snap, id0, horg='g')
     xr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Xc']
-    yr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Xc']
-    zr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Xc']
+    yr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Yc']
+    zr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Zc']
    
     ncpu  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=0, max_rows=1)[2])
     ndim  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=1, max_rows=1)[2])
@@ -544,7 +545,6 @@ def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread,
     larr[7] = np.int32(levmin)
     larr[8] = np.int32(levmax)
 
-
     jsamr2cell_totnum_py.jsamr2cell_totnum(larr, darr, file_a, file_h, domlist)
     ntot    = jsamr2cell_totnum_py.ntot
     nvarh   = jsamr2cell_totnum_py.nvarh
@@ -596,3 +596,73 @@ def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread,
     data['temp'][:] = data['temp'][:] / data['den'][:] * unit_T2    # [K/mu]
     data['den'][:]  *= nH                                           # [atom/cc]
     return data
+
+##-----
+## Draw Gas Map
+##-----
+def d_gasmap(n_snap, id0, cell, xr=None, yr=None, n_pix=1000, amrtype='den', minlev=None, maxlev=None, num_thread=num_thread, proj='xy'):
+
+    """
+    Initialize
+    """
+    if(xr==None or yr==None):
+        galtmp  = f_rdgal(n_snap, id0, horg='g')
+        xr  = np.array([-1, 1.],dtype='<f8') * 5. + galtmp['Xc']
+        yr  = np.array([-1, 1.],dtype='<f8') * 5. + galtmp['Yc']
+
+    if(minlev==None):
+        minlev  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=2, max_rows=1)[2])
+    if(maxlev==None):
+        maxlev  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=3, max_rows=1)[2])
+
+    gasmap  = np.zeros((n_pix,n_pix),dtype='<f8')
+    gasmap_t= np.zeros((n_pix,n_pix),dtype='<f8')
+
+    levind  = np.array(range(maxlev-minlev+1),dtype='int32') + minlev
+
+    for lev in levind:
+        ind = np.where(cell['level'][:]==lev)
+        if(np.size(ind)==0): continue
+
+        if(proj=='xy'):
+            xx  = cell['xx'][ind]
+            yy  = cell['yy'][ind]
+        elif(proj=='xz'):
+            xx  = cell['xx'][ind]
+            yy  = cell['zz'][ind]
+
+        bw  = np.array([1.,1.], dtype='<f8')*cell['dx'][ind[0][0]]
+
+        var = np.zeros((np.size(ind),2),dtype='<f8')
+        var[:,0]    = cell['temp'][ind]
+        var[:,1]    = cell['den'][ind]
+
+        larr    = np.zeros(20, dtype=np.int32)
+        darr    = np.zeros(20, dtype='<f8')
+
+        larr[0] = np.int32(np.size(ind))
+        larr[1] = np.int32(n_pix)
+        larr[2] = np.int32(num_thread)
+        if(amrtype=='den'): larr[10] = 2
+        if(amrtype=='temp'): larr[10] = 1
+        if(amrtype=='d-temp'): larr[10] = 3
+
+        js_gasmap_py.js_gasmap(larr, darr, xx, yy, var, bw, xr, yr)
+        mapdum  = js_gasmap_py.map
+
+        if(amrtype=='temp'): gasmap = gasmap > mapdum
+        if(amrtype=='den'): gasmap = gasmap + mapdum
+        if(amrtype=='d-temp'):
+            gasmap  += mapdum
+
+            larr[10]    = 2
+            js_gasmap_py.js_gasmap(larr, darr, xx, yy, var, bw, xr, yr)
+            mapdum  = js_gasmap_py.map
+
+            gasmap_t    += mapdum
+
+    if(amrtype=='d_temp'):
+        ind = np.where(gasmap_t > 0)
+        gasmap[ind] = gasmap[ind] / gasmap_t[ind]
+
+    return gasmap
