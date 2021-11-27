@@ -18,6 +18,8 @@ import pickle
 from fortran.find_domain_py import find_domain_py
 from fortran.get_ptcl_py import get_ptcl_py
 from fortran.get_flux_py import get_flux_py
+from fortran.jsamr2cell_totnum_py import jsamr2cell_totnum_py
+from fortran.jsamr2cell_py import jsamr2cell_py
 
 ##-----
 ## General Settings
@@ -473,4 +475,124 @@ def g_cfttable(H0, oM, oL):
         with open(fname, 'wb') as f:
             pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
 
+    return data
+
+##-----
+## LOAD AMR data
+##-----
+def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread, 
+        dir_raw=dir_raw, dir_catalog=dir_catalog, ndomain=r_type_ndomain):
+
+    """
+    Initialize
+    """
+    galtmp  = f_rdgal(n_snap, id0, horg='g')
+    xr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Xc']
+    yr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Xc']
+    zr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Xc']
+   
+    ncpu  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=0, max_rows=1)[2])
+    ndim  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=1, max_rows=1)[2])
+    levmin  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=2, max_rows=1)[2])
+    levmax  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=3, max_rows=1)[2])
+    unit_l  = np.double(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=15, max_rows=1)[2])
+    unit_t  = np.double(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=17, max_rows=1)[2])
+    kms     = np.double(unit_l / unit_t / 1e5)
+    unit_d  = np.double(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=16, max_rows=1)[2])
+    unit_m  = unit_d * unit_l**3
+    hindex  = np.double(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=21)[:,1:])
+
+    kms     = np.double(unit_l / unit_t / 1e5)
+    unit_T2 = np.double(1.6600000e-24) / np.double(1.3806200e-16) * np.double(unit_l / unit_t)**2
+    nH  = np.double(0.76) / np.double(1.6600000e-24) * unit_d
+    #----- Find Domain
+    domlist = np.zeros(ndomain, dtype=np.int32) - 1
+    xc  = galtmp['Xc']/unit_l * 3.086e21
+    yc  = galtmp['Yc']/unit_l * 3.086e21
+    zc  = galtmp['Zc']/unit_l * 3.086e21
+    rr  = galtmp['R_HalfMass']/unit_l * 3.086e21
+    larr    = np.zeros(20, dtype=np.int32)
+    darr    = np.zeros(20, dtype='<f8')
+
+    larr[0] = np.int32(len(xc))
+    larr[1] = np.int32(len(domlist))
+    larr[2] = np.int32(num_thread)
+    larr[3] = np.int32(levmax)
+
+    darr[0] = 50.
+    if(boxrange!=None): darr[0] = boxrange / (rr * unit_l / 3.086e21)
+
+    find_domain_py.find_domain(xc, yc, zc, rr, hindex, larr, darr)
+    domlist     = find_domain_py.dom_list
+    domlist     = domlist[0][:]
+    domlist = np.int32(np.array(np.where(domlist > 0))[0] + 1)
+
+    #----- READ AMR (Get Total number of leaf cells)
+    larr    = np.zeros(20, dtype=np.int32)
+    darr    = np.zeros(20, dtype='<f8')
+
+    file_a  = dir_raw + 'output_%0.5d'%n_snap + '/amr_%0.5d'%n_snap + '.out'
+    file_h  = dir_raw + 'output_%0.5d'%n_snap + '/hydro_%0.5d'%n_snap + '.out'
+    file_i  = dir_raw + 'output_%0.5d'%n_snap + '/info_%0.5d'%n_snap + '.txt'
+
+    larr[0] = np.int32(len(domlist))
+    larr[2] = np.int32(1)#np.int32(num_thread)
+    larr[3] = np.int32(len(file_a))
+    larr[4] = np.int32(len(file_h))
+    larr[5] = np.int32(ncpu)
+    larr[6] = np.int32(ndim)
+    larr[7] = np.int32(levmin)
+    larr[8] = np.int32(levmax)
+
+
+    jsamr2cell_totnum_py.jsamr2cell_totnum(larr, darr, file_a, file_h, domlist)
+    ntot    = jsamr2cell_totnum_py.ntot
+    nvarh   = jsamr2cell_totnum_py.nvarh
+    mg_ind  = jsamr2cell_totnum_py.mg_ind
+
+    #----- READ AMR (ALLOCATE)
+    data    = np.zeros(ntot, dtype=[('xx','<f8'), ('yy','<f8'), ('zz','<f8'), 
+        ('vx','<f8'), ('vy','<f8'), ('vz','<f8'), ('dx','<f8'),
+        ('den','<f8'), ('temp','<f8'), ('metal','<f8'), ('level','int32')])
+
+    ##----- READ AMR
+    larr    = np.zeros(20, dtype=np.int32)
+    darr    = np.zeros(20, dtype='<f8')
+
+    larr[0] = np.int32(len(domlist))
+    larr[2] = np.int32(num_thread)
+    larr[3] = np.int32(len(file_a))
+    larr[4] = np.int32(len(file_h))
+    larr[5] = np.int32(len(file_i))
+    larr[6] = np.int32(ncpu)
+    larr[7] = np.int32(ndim)
+    larr[8] = np.int32(levmin)
+    larr[9] = np.int32(levmax)
+    larr[10]= np.int32(ntot)
+    larr[11]= np.int32(nvarh)
+
+    jsamr2cell_py.jsamr2cell(larr, darr, file_a, file_h, file_i, mg_ind, domlist)
+    xgdum   = np.array(jsamr2cell_py.mesh_xg,dtype='<f8')
+    hvdum   = np.array(jsamr2cell_py.mesh_hd,dtype='<f8')
+    dxdum   = np.array(jsamr2cell_py.mesh_dx,dtype='<f8')
+    lvdum   = np.array(jsamr2cell_py.mesh_lv,dtype='int32')
+
+    data['xx'][:]   = xgdum[:,0] * unit_l / np.double(3.086e21)
+    data['yy'][:]   = xgdum[:,1] * unit_l / np.double(3.086e21)
+    data['zz'][:]   = xgdum[:,2] * unit_l / np.double(3.086e21)
+    data['vx'][:]   = hvdum[:,1] * kms
+    data['vy'][:]   = hvdum[:,2] * kms
+    data['vz'][:]   = hvdum[:,3] * kms
+    data['den'][:]  = hvdum[:,0]# * unit_d
+    data['temp'][:] = hvdum[:,4]
+    data['metal'][:]= hvdum[:,5]
+    data['dx'][:]   = dxdum[:] * unit_l / np.double(3.086e21)
+    data['level'][:]= lvdum[:]
+
+    data    = data[np.where(lvdum >= 0)]
+    dumA = data['temp'][:]
+    dumB = data['den'][:]
+    
+    data['temp'][:] = data['temp'][:] / data['den'][:] * unit_T2    # [K/mu]
+    data['den'][:]  *= nH                                           # [atom/cc]
     return data
