@@ -607,8 +607,8 @@ def d_gasmap(n_snap, id0, cell, xr=None, yr=None, n_pix=1000, amrtype='den', min
     """
     if(xr==None or yr==None):
         galtmp  = f_rdgal(n_snap, id0, horg='g')
-        xr  = np.array([-1, 1.],dtype='<f8') * 5. + galtmp['Xc']
-        yr  = np.array([-1, 1.],dtype='<f8') * 5. + galtmp['Yc']
+        xr  = np.array([-1, 1.],dtype='<f8') * 50. + galtmp['Xc']
+        yr  = np.array([-1, 1.],dtype='<f8') * 50. + galtmp['Yc']
 
     if(minlev==None):
         minlev  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=2, max_rows=1)[2])
@@ -665,4 +665,14 @@ def d_gasmap(n_snap, id0, cell, xr=None, yr=None, n_pix=1000, amrtype='den', min
         ind = np.where(gasmap_t > 0)
         gasmap[ind] = gasmap[ind] / gasmap_t[ind]
 
+    return gasmap
+
+##-----
+## Get img
+##-----
+def g_img(gasmap, scale='log'):
+    if(scale=='log'):
+        gasmap  = np.log10(gasmap + 1.)
+        gasmap  = gasmap/np.max(gasmap)
+        gasmap  = np.int32(gasmap * 255.)
     return gasmap
