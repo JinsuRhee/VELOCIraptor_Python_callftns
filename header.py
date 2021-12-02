@@ -13,7 +13,7 @@ import scipy.integrate as integrate
 import statistics
 from mpl_toolkits import mplot3d
 
-import pickle
+import pickle5 as pickle
 
 from fortran.find_domain_py import find_domain_py
 from fortran.get_ptcl_py import get_ptcl_py
@@ -595,20 +595,22 @@ def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread,
     
     data['temp'][:] = data['temp'][:] / data['den'][:] * unit_T2    # [K/mu]
     data['den'][:]  *= nH                                           # [atom/cc]
-    return data
+    return data, boxrange
 
 ##-----
 ## Draw Gas Map
 ##-----
-def d_gasmap(n_snap, id0, cell, xr=None, yr=None, n_pix=1000, amrtype='den', minlev=None, maxlev=None, num_thread=num_thread, proj='xy'):
+def d_gasmap(n_snap, id0, cell2, xr=None, yr=None, n_pix=1000, amrtype='den', minlev=None, maxlev=None, num_thread=num_thread, proj='xy'):
 
     """
     Initialize
     """
+    cell    = cell2[0]
+    boxrange= cell2[1]
     if(xr==None or yr==None):
         galtmp  = f_rdgal(n_snap, id0, horg='g')
-        xr  = np.array([-1, 1.],dtype='<f8') * 50. + galtmp['Xc']
-        yr  = np.array([-1, 1.],dtype='<f8') * 50. + galtmp['Yc']
+        xr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Xc']
+        yr  = np.array([-1, 1.],dtype='<f8') * boxrange + galtmp['Yc']
 
     if(minlev==None):
         minlev  = np.int32(np.loadtxt(dir_raw+'output_%0.5d'%n_snap+"/info_%0.5d"%n_snap+".txt", dtype=object, skiprows=2, max_rows=1)[2])
