@@ -70,6 +70,11 @@ if(simulation_type=='FN'):
 ssp_type    = 'chab'
 
 ##-----
+## TREE RELATED
+##-----
+treefile    = '/storage5/FORNAX/VELOCIraptor/Galaxy/tree/l3/ctree.dat'
+
+##-----
 ## LOAD GALAXY
 ##      TO DO
 ##      *) do not use 'imglist.txt'
@@ -678,3 +683,87 @@ def g_img(gasmap, scale='log'):
         gasmap  = gasmap/np.max(gasmap)
         gasmap  = np.int32(gasmap * 255.)
     return gasmap
+
+##-----
+## Get Evolution
+##-----
+def f_getevol(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, directory=dir_catalog):
+
+    ## Get tree of this galaxy
+    tree    = f_gettree(n_snap, id0, horg=horg, directory=directory)
+
+    idlist  = np.array(tree[0],dtype='int32')
+    snlist  = np.array(tree[1],dtype='int32')
+    n_link  = len(idlist)
+
+    ## First read the galaxy
+    g0  = f_rdgal(n_snap, id0, datalist=datalist, horg=horg, gprop=gprop, directory=directory)
+    
+    ## ALLOCATE
+    gal = np.zeros(n_link, dtype=g0.dtype)
+
+    ## READ
+    ind = np.array(range(n_link),dtype='int32')
+    for i in ind:
+        gal[i]  = f_rdgal(snlist[i], idlist[i], datalist=datalist, horg=horg, gprop=gprop, directory=directory)
+
+    return gal
+
+##-----
+## Read AND Generate Tree File
+##-----
+def f_gettree_readdat(filename):
+    with open(filename,'rb') as f:
+        longtype    = np.dtype(np.int32)
+        bdata       = np.fromfile(f,dtype=longtype)
+
+        ## READ
+        n_branch    = bdata[0]
+        b_startind  = np.zeros(n_branch, dtype='int32')
+
+        ind0    = np.int32(1)
+        ind = np.array(range(n_branch),dtype='int32')
+        for i in ind:
+            b_startind[i]   = ind0
+            ind0    += np.int32(bdata[ind0] * 2 + 1)
+
+        tree_key    = bdata[ind0+1:-1]
+
+        return bdata, b_startind, tree_key
+
+def f_gettree(n_snap, id0, horg='g', directory=dir_catalog):
+
+    ## Initialize
+    if(horg=='g'):
+        dir_tree    = directory + 'Galaxy/tree/'
+    elif(horg=='h'):
+        dir_tree    = directory + 'Halo/tree/'
+
+    ## Is pickle?
+    fname   = dir_tree + 'ctree.pkl'
+    isfile = os.path.isfile(fname)
+
+    if(isfile==True):
+        with open(fname, 'rb') as f:
+            data = pickle.load(f)
+    else:
+        fname_bin   = dir_tree + 'ctree.dat'
+        data    = f_gettree_readdat(fname_bin)
+        with open(fname, 'wb') as f:
+            pickle.dump(data, f, pickle.HIGHEST_PROTOCOL)
+
+    branch  = data[0]
+    bind    = data[1]
+    key     = data[2]
+
+    keyval  = n_snap + key[0]*id0
+    kind    = key[keyval]
+    ind0    = bind[kind]
+
+    n_link  = branch[ind0]
+
+    idlist  = branch[ind0+1:ind0+n_link+1]
+    snlist  = branch[ind0+n_link+1:ind0+n_link*2+1]
+
+    return idlist, snlist
+
