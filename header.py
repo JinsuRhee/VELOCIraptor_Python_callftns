@@ -25,13 +25,13 @@ from fortran.js_gasmap_py import js_gasmap_py
 ##-----
 ## General Settings
 ##-----
-num_thread = int(40)
+num_thread = int(1)
 
 ##-----
 ## Path Settings
 ##-----
-dir_raw     = '/storage5/FORNAX/KISTI_OUTPUT/l10006/'
-dir_catalog = '/storage5/FORNAX/VELOCIraptor/l10006/'
+dir_raw     = '/data84/obelisk/RHD/OUTPUTS/'
+dir_catalog = '/data80/jinsu/obelisk/catalog/'
 
 ##-----
 ## VR output-related
@@ -47,22 +47,10 @@ flux_zp = np.double(np.array([895.5*1e-11, 466.9*1e-11, 278.0*1e-11, 185.2*1e-11
 ##-----
 ## RAMSES-related Settings
 ##-----
-simulation_type='FN'
-if(simulation_type=='NH'):
-    r_type_llint    = False
-    r_type_family   = False
-    r_type_neff     = 4096
-    r_type_ndomain  = 4800
-if(simulation_type=='NH2'):
-    r_type_llint    = False
-    r_type_family   = True
-    r_type_neff     = 4096
-    r_type_ndomain  = 480
-if(simulation_type=='FN'):
-    r_type_llint    = False
-    r_type_family   = True
-    r_type_neff     = 2048
-    r_type_ndomain  = 480
+r_type_llint    = False
+r_type_family   = True
+r_type_neff     = 4096
+r_type_ndomain  = 4800
 
 ##-----
 ## SSP TYPE
@@ -72,7 +60,7 @@ ssp_type    = 'chab'
 ##-----
 ## TREE RELATED
 ##-----
-treefile    = '/storage5/FORNAX/VELOCIraptor/Galaxy/tree/l3/ctree.dat'
+#treefile    = '/storage5/FORNAX/VELOCIraptor/Galaxy/tree/l3/ctree.dat'
 
 ##-----
 ## LOAD GALAXY
