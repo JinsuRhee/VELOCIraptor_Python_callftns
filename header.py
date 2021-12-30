@@ -117,7 +117,7 @@ def f_rdgal(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, d
             if(name=='isclump'): dtype=dtype+[(name, '<f8')]
             elif(name=='rate'): dtype=dtype+[(name, '<f8')]
             elif(name=='Aexp'): dtype=dtype+[(name, '<f8')]
-            elif(name=='snapnum'): dtype=dtype+[(name, '<f8')]
+            elif(name=='snapnum'): dtype=dtype+[(name, np.int32)]
             else: dtype=dtype+[(name, 'object')]
 
     galdata=np.zeros(len(flist), dtype=dtype)
@@ -139,8 +139,7 @@ def f_rdgal(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, d
                 elif(name=='isclump'): xdata=dat.get("/isclump")
                 elif(name=='rate'): xdata=dat.get("/rate")
                 elif(name=='Aexp'): xdata=dat.get("/Aexp")
-                ##elif(name=='snapnum'):
-                ##    galdata['snapnum'][i]=n_snap
+                elif(name=='snapnum'): xdata=np.int32(n_snap)
                 ##    break
                 ##else: xdata=dat.get(name)
                 galdata[name][i]=np.array(xdata)
