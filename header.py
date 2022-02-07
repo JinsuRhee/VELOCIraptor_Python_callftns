@@ -25,13 +25,13 @@ from fortran.js_gasmap_py import js_gasmap_py
 ##-----
 ## General Settings
 ##-----
-num_thread = int(40)
+num_thread = int(10)
 
 ##-----
 ## Path Settings
 ##-----
-dir_raw     = '/storage5/FORNAX/KISTI_OUTPUT/l10006/'
-dir_catalog = '/storage5/FORNAX/VELOCIraptor/l10006/'
+dir_raw     = '/storage6/NewHorizon/snapshots/'
+dir_catalog = '/storage5/NewHorizon/VELOCIraptor/'
 
 ##-----
 ## VR output-related
@@ -47,7 +47,7 @@ flux_zp = np.double(np.array([895.5*1e-11, 466.9*1e-11, 278.0*1e-11, 185.2*1e-11
 ##-----
 ## RAMSES-related Settings
 ##-----
-simulation_type='FN'
+simulation_type='NH'
 if(simulation_type=='NH'):
     r_type_llint    = False
     r_type_family   = False
