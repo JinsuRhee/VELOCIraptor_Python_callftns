@@ -745,9 +745,13 @@ def f_gettree_readdat(filename):
         ind0    = np.int32(1)
         ind = np.array(range(n_branch),dtype='int32')
         for i in ind:
+            #if(ind0>59775170):print(i)
             b_startind[i]   = ind0
+            if(i==76):print(bdata[ind0:ind0+bdata[ind0]*2+1])
             ind0    += np.int32(bdata[ind0] * 2 + 1)
+            #if(ind0>59775170):print(i)
             ind0    += np.int32(bdata[ind0] * 4 + 1)
+
 
         tree_key    = bdata[ind0+1:-1]
         return bdata, b_startind, tree_key
