@@ -98,10 +98,11 @@ def f_rdgal(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, d
         
     dtype=[]
     for name in column_list:
-        dtype=dtype+[(name, '<f8')]
-        ##if(name=='SFR' and horg=='g'): dtype=dtype+[(name, 'object')]
-        ##elif(name=='ABmag' and horg=='g'): dtype=dtype+[(name, 'object')]
-        ##else: dtype=dtype+[(name, '<f8')]
+        if(name=='SFR' and horg=='g'): dtype=dtype+[(name, 'object')]
+        elif(name=='ABmag' and horg=='g'): dtype=dtype+[(name, 'object')]
+        elif(name=='ID' or name=='hostHaloID' or name=='numSubStruct' or name=='Structuretype' or name=='npart'): dtype=dtype+[(name, np.int32)]
+        elif(name=='ID_mbp'): dtype=dtype+[(name, np.int64)]
+        else: dtype=dtype+[(name, '<f8')]
 
     if(horg=='g'):
         column_list_additional=['Domain_List', 'Flux_List', 'MAG_R', 'SFR_R', 'SFR_T', 'ConFrac', 'CONF_R',
@@ -114,14 +115,14 @@ def f_rdgal(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, d
 
     if(horg=='g'):
         for name in column_list_additional:
-            if(name=='isclump'): dtype=dtype+[(name, '<f8')]
+            if(name=='isclump'): dtype=dtype+[(name, np.int32)]
             elif(name=='rate'): dtype=dtype+[(name, '<f8')]
             elif(name=='Aexp'): dtype=dtype+[(name, '<f8')]
             elif(name=='snapnum'): dtype=dtype+[(name, np.int32)]
-            elif(name=='npart'): dtype=dtype+[(name, np.int32)]
             else: dtype=dtype+[(name, 'object')]
 
     galdata=np.zeros(len(flist), dtype=dtype)
+
     for i, fn in enumerate(flist):
         dat= h5py.File(fn, 'r')
         for name in column_list:
@@ -146,6 +147,7 @@ def f_rdgal(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties, d
                 elif(name=='SFR_R'): xdata=dat.get("/SFR_R")
                 elif(name=='SFR_T'): xdata=dat.get("/SFR_T")
                 elif(name=='snapnum'): xdata=np.int32(n_snap)
+                elif(name=='SFR' or name=='ABmag'): xdata=dat.get("G_Prop/G_" + name)
                 ##    break
                 ##else: xdata=dat.get(name)
                 galdata[name][i]=np.array(xdata)
@@ -490,8 +492,11 @@ def g_cfttable(H0, oM, oL):
 
 ##-----
 ## LOAD AMR data
+##
+##  TO DO LIST
+##      1) raw_xc input setting (box unit? kpc unit?)
 ##-----
-def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread, 
+def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread, raw=False, raw_xc=None, raw_yc=None, raw_zc=None,  
         dir_raw=dir_raw, dir_catalog=dir_catalog, ndomain=r_type_ndomain):
 
     """
@@ -516,11 +521,19 @@ def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread,
     kms     = np.double(unit_l / unit_t / 1e5)
     unit_T2 = np.double(1.6600000e-24) / np.double(1.3806200e-16) * np.double(unit_l / unit_t)**2
     nH  = np.double(0.76) / np.double(1.6600000e-24) * unit_d
+
     #----- Find Domain
     domlist = np.zeros(ndomain, dtype=np.int32) - 1
     xc  = galtmp['Xc']/unit_l * 3.086e21
     yc  = galtmp['Yc']/unit_l * 3.086e21
     zc  = galtmp['Zc']/unit_l * 3.086e21
+
+    #----- Reset Center when loading the raw map
+    if(raw==True):
+        if(raw_xc!=None):xc = np.array(raw_xc/unit_l * 3.086e21)
+        if(raw_yc!=None):xc = np.array(raw_yc/unit_l * 3.086e21)
+        if(raw_zc!=None):xc = np.array(raw_zc/unit_l * 3.086e21)
+
     rr  = galtmp['R_HalfMass']/unit_l * 3.086e21
     larr    = np.zeros(20, dtype=np.int32)
     darr    = np.zeros(20, dtype='<f8')
@@ -562,7 +575,7 @@ def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread,
 
     #----- READ AMR (ALLOCATE)
     data    = np.zeros(ntot, dtype=[('xx','<f8'), ('yy','<f8'), ('zz','<f8'), 
-        ('vx','<f8'), ('vy','<f8'), ('vz','<f8'), ('dx','<f8'),
+        ('vx','<f8'), ('vy','<f8'), ('vz','<f8'), ('dx','<f8'), ('mass', '<f8'), 
         ('den','<f8'), ('temp','<f8'), ('metal','<f8'), ('level','int32')])
 
     ##----- READ AMR
@@ -593,11 +606,14 @@ def f_rdamr(n_snap, id0, boxrange=50., num_thread=num_thread,
     data['vx'][:]   = hvdum[:,1] * kms
     data['vy'][:]   = hvdum[:,2] * kms
     data['vz'][:]   = hvdum[:,3] * kms
-    data['den'][:]  = hvdum[:,0]# * unit_d
+    data['den'][:]  = hvdum[:,0]
     data['temp'][:] = hvdum[:,4]
     data['metal'][:]= hvdum[:,5]
     data['dx'][:]   = dxdum[:] * unit_l / np.double(3.086e21)
     data['level'][:]= lvdum[:]
+    #data['mass'][:] = np.double(10.**(np.log10(hvdum[:,0]) + np.log10(unit_d) + np.double(3.0) * (np.log10(dxdum[:]) + np.log10(unit_l)) - np.log10(1.98892e33)))
+    data['mass'][:] = hvdum[:,0] *unit_d * (dxdum[:] * unit_l)**3 / np.double(1.98892e33)
+    
 
     data    = data[np.where(lvdum >= 0)]
     dumA = data['temp'][:]
@@ -703,7 +719,7 @@ def f_getevol(n_snap, id0, datalist=column_list, horg='g', gprop=gal_properties,
 
     ## First read the galaxy
     g0  = f_rdgal(n_snap, id0, datalist=datalist, horg=horg, gprop=gprop, directory=directory)
-    
+
     ## ALLOCATE
     gal = np.zeros(n_link, dtype=g0.dtype)
 
@@ -731,9 +747,9 @@ def f_gettree_readdat(filename):
         for i in ind:
             b_startind[i]   = ind0
             ind0    += np.int32(bdata[ind0] * 2 + 1)
+            ind0    += np.int32(bdata[ind0] * 4 + 1)
 
         tree_key    = bdata[ind0+1:-1]
-
         return bdata, b_startind, tree_key
 
 def f_gettree(n_snap, id0, horg='g', directory=dir_catalog):
@@ -770,5 +786,18 @@ def f_gettree(n_snap, id0, horg='g', directory=dir_catalog):
     idlist  = branch[ind0+1:ind0+n_link+1]
     snlist  = branch[ind0+n_link+1:ind0+n_link*2+1]
 
-    return idlist, snlist
+    ind1    = ind0 + n_link*2+1
+    n_prog  = branch[ind1]
+
+    m_idlist    = np.zeros(1, dtype=np.int32) - 1
+    m_snaplist  = np.zeros(1, dtype=np.int32) - 1
+    m_merit     = np.zeros(1, dtype='<f8') - 1.
+    m_bid       = np.zeros(1, dtype=np.int32) - 1
+    if(n_prog>0):
+        m_idlist    = branch[ind1+1:ind1+n_prog+1]
+        m_snaplist  = branch[ind1+n_prog+1:ind1+n_prog*2+1]
+        m_merit     = np.double(branch[ind1+n_prog*2+1:ind1+n_prog*3+1])/1e10
+        m_bid       = branch[ind1+n_prog*3+1:ind1+n_prog*4+1]
+
+    return idlist, snlist, m_idlist, m_snaplist, m_merit, m_bid
 
